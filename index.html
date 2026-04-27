@@ -1,0 +1,619 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI Music Genre Classifier</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --purple: #7c3aed;
+      --blue: #2563eb;
+      --purple-light: #a78bfa;
+      --blue-light: #60a5fa;
+      --text-primary: #f0f0ff;
+      --text-secondary: #8888aa;
+      --text-muted: #55557a;
+      --bg-card: rgba(255,255,255,0.04);
+      --border-card: rgba(255,255,255,0.09);
+      --bg-app: #0a0a12;
+    }
+
+    html, body {
+      min-height: 100%;
+      background: var(--bg-app);
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      color: var(--text-primary);
+    }
+
+    /* ── Animated background ── */
+    .bg-orbs {
+      position: fixed; inset: 0; pointer-events: none; overflow: hidden; z-index: 0;
+    }
+    .orb {
+      position: absolute; border-radius: 50%;
+      filter: blur(90px); opacity: 0.18;
+      animation: drift 12s ease-in-out infinite alternate;
+    }
+    .orb1 { width: 520px; height: 520px; background: #7c3aed; top: -120px; left: -120px; animation-delay: 0s; }
+    .orb2 { width: 420px; height: 420px; background: #2563eb; bottom: -100px; right: -100px; animation-delay: -4s; }
+    .orb3 { width: 320px; height: 320px; background: #a855f7; top: 40%; left: 50%; animation-delay: -8s; }
+
+    @keyframes drift {
+      from { transform: translate(0,0) scale(1); }
+      to   { transform: translate(35px,25px) scale(1.06); }
+    }
+
+    /* ── Layout ── */
+    .app {
+      position: relative; z-index: 1;
+      min-height: 100vh;
+      padding: 2.5rem 1rem 2rem;
+      display: flex; flex-direction: column; align-items: center;
+    }
+
+    .content { width: 100%; max-width: 680px; }
+
+    /* ── Header ── */
+    header { text-align: center; margin-bottom: 2rem; }
+    .logo-row {
+      display: flex; align-items: center; justify-content: center; gap: 10px; margin-bottom: 8px;
+    }
+    .logo-icon {
+      width: 42px; height: 42px; border-radius: 11px;
+      background: linear-gradient(135deg, #7c3aed, #2563eb);
+      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    }
+    h1 { font-size: 24px; font-weight: 700; letter-spacing: -0.4px; color: var(--text-primary); }
+    .subtitle { font-size: 14px; color: var(--text-secondary); margin-top: 4px; }
+
+    /* ── Cards ── */
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-card);
+      border-radius: 20px;
+      padding: 1.75rem;
+      margin-bottom: 1rem;
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+    }
+
+    .section-label {
+      font-size: 11px; font-weight: 600; text-transform: uppercase;
+      letter-spacing: 0.9px; color: var(--text-muted); margin-bottom: 14px;
+    }
+
+    /* ── Drop zone ── */
+    .drop-zone {
+      border: 2px dashed rgba(124,58,237,0.45);
+      border-radius: 14px;
+      padding: 2.5rem 1rem;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.25s ease;
+      background: rgba(124,58,237,0.04);
+      user-select: none;
+    }
+    .drop-zone:hover,
+    .drop-zone.drag-over {
+      border-color: rgba(124,58,237,0.85);
+      background: rgba(124,58,237,0.1);
+      transform: scale(1.01);
+    }
+    .drop-icon {
+      width: 54px; height: 54px; margin: 0 auto 14px;
+      background: rgba(124,58,237,0.15);
+      border: 1px solid rgba(124,58,237,0.3);
+      border-radius: 14px;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .drop-title { font-size: 15px; font-weight: 600; color: #d0d0f0; margin-bottom: 5px; }
+    .drop-sub   { font-size: 13px; color: #66668a; }
+    .drop-sub span { color: #9f7cff; cursor: pointer; text-decoration: underline; }
+    .format-pills { display: flex; gap: 6px; justify-content: center; margin-top: 14px; flex-wrap: wrap; }
+    .pill {
+      padding: 3px 11px; border-radius: 20px; font-size: 11px; font-weight: 600;
+      background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); color: #8888aa;
+    }
+
+    /* ── File info strip ── */
+    .file-info {
+      display: flex; align-items: center; gap: 12px; padding: 12px 14px;
+      background: rgba(124,58,237,0.1); border: 1px solid rgba(124,58,237,0.25);
+      border-radius: 12px; margin-top: 12px;
+    }
+    .file-icon {
+      width: 38px; height: 38px; border-radius: 9px;
+      background: rgba(124,58,237,0.25);
+      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    }
+    .file-name  { font-size: 13px; font-weight: 600; color: #d0d0f0; }
+    .file-size  { font-size: 12px; color: #66668a; margin-top: 1px; }
+    .file-remove { margin-left: auto; cursor: pointer; color: #66668a; font-size: 22px; line-height: 1; transition: color 0.2s; }
+    .file-remove:hover { color: #e05a5a; }
+
+    /* ── Predict button ── */
+    .predict-btn {
+      width: 100%; margin-top: 14px; padding: 14px;
+      border-radius: 12px; border: none; cursor: pointer;
+      font-size: 15px; font-weight: 700; letter-spacing: 0.2px;
+      background: linear-gradient(135deg, #7c3aed, #2563eb);
+      color: #fff;
+      transition: opacity 0.2s, transform 0.15s;
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+    }
+    .predict-btn:hover:not(:disabled) { opacity: 0.88; transform: translateY(-1px); }
+    .predict-btn:active:not(:disabled) { transform: scale(0.985); }
+    .predict-btn:disabled { opacity: 0.38; cursor: not-allowed; }
+
+    /* ── Spinner ── */
+    .spinner {
+      width: 17px; height: 17px;
+      border: 2px solid rgba(255,255,255,0.3);
+      border-top-color: #fff; border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Audio player ── */
+    .player-row { display: flex; align-items: center; gap: 12px; }
+    .play-btn {
+      width: 46px; height: 46px; border-radius: 50%; flex-shrink: 0;
+      background: linear-gradient(135deg, #7c3aed, #2563eb);
+      border: none; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: transform 0.15s, opacity 0.2s;
+    }
+    .play-btn:hover  { transform: scale(1.07); }
+    .play-btn:active { transform: scale(0.93); }
+
+    .progress-track {
+      flex: 1; height: 4px; background: rgba(255,255,255,0.1);
+      border-radius: 2px; cursor: pointer; position: relative;
+    }
+    .progress-fill {
+      height: 100%; border-radius: 2px;
+      background: linear-gradient(90deg, #7c3aed, #2563eb);
+      transition: width 0.1s linear; pointer-events: none;
+    }
+    .time-label { font-size: 12px; color: var(--text-muted); min-width: 38px; text-align: right; }
+
+    /* ── Waveform ── */
+    .waveform {
+      height: 64px; display: flex; align-items: center; gap: 2px;
+      overflow: hidden; margin-top: 14px;
+    }
+    .bar { flex: 1; border-radius: 2px; background: rgba(124,58,237,0.28); transition: background 0.15s; }
+    .bar.played { background: rgba(99,102,241,0.58); }
+    .bar.active { background: rgba(167,139,250,0.95); }
+
+    /* ── Result card ── */
+    .result-card { animation: slideUp 0.42s cubic-bezier(0.22,1,0.36,1); }
+    @keyframes slideUp {
+      from { opacity: 0; transform: translateY(20px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .result-top { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
+    .genre-badge {
+      display: inline-block; padding: 5px 16px; border-radius: 30px;
+      font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.1px;
+      background: rgba(124,58,237,0.18); border: 1px solid rgba(124,58,237,0.35); color: #a78bfa;
+      margin-bottom: 10px;
+    }
+    .genre-name {
+      font-size: 44px; font-weight: 800; letter-spacing: -1.5px;
+      background: linear-gradient(135deg, #a78bfa, #60a5fa);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      background-clip: text; line-height: 1.05;
+    }
+    .conf-block { text-align: right; }
+    .conf-block .label { font-size: 11px; color: var(--text-muted); margin-bottom: 2px; }
+    .conf-pct { font-size: 38px; font-weight: 800; color: #a78bfa; letter-spacing: -1px; }
+
+    .conf-row { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px; }
+    .conf-row .c-label { font-size: 13px; color: var(--text-secondary); }
+    .conf-track { height: 8px; background: rgba(255,255,255,0.07); border-radius: 4px; overflow: hidden; }
+    .conf-fill {
+      height: 100%; border-radius: 4px;
+      background: linear-gradient(90deg, #7c3aed, #60a5fa);
+      transition: width 1.1s cubic-bezier(0.22,1,0.36,1);
+    }
+
+    .other-genres { margin-top: 18px; display: flex; flex-wrap: wrap; gap: 8px; }
+    .other-label { width: 100%; font-size: 11px; color: #44445a; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 2px; }
+    .genre-chip {
+      padding: 5px 13px; border-radius: 8px; font-size: 12px;
+      background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.09);
+      color: #8888aa; display: flex; align-items: center; gap: 7px;
+    }
+    .chip-bar { height: 3px; border-radius: 2px; background: rgba(124,58,237,0.5); }
+    .chip-pct { color: #55557a; margin-left: 2px; }
+
+    /* ── Footer ── */
+    footer {
+      text-align: center; padding: 1.5rem 0 0.5rem;
+      font-size: 12px; color: #44445a;
+    }
+    footer span { color: #7c3aed; font-weight: 600; }
+
+    /* ── Utility ── */
+    .hidden { display: none !important; }
+    input[type="file"] { display: none; }
+
+    /* ── Responsive ── */
+    @media (max-width: 480px) {
+      h1 { font-size: 18px; }
+      .genre-name { font-size: 30px; }
+      .conf-pct { font-size: 28px; }
+      .card { padding: 1.25rem; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="bg-orbs">
+  <div class="orb orb1"></div>
+  <div class="orb orb2"></div>
+  <div class="orb orb3"></div>
+</div>
+
+<div class="app">
+  <div class="content">
+
+    <!-- Header -->
+    <header>
+      <div class="logo-row">
+        <div class="logo-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M9 18V5l12-2v13" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <circle cx="6" cy="18" r="3" stroke="#fff" stroke-width="2"/>
+            <circle cx="18" cy="16" r="3" stroke="#fff" stroke-width="2"/>
+          </svg>
+        </div>
+        <h1>AI Music Genre Classifier</h1>
+      </div>
+      <p class="subtitle">Upload a song and let AI identify its genre</p>
+    </header>
+
+    <!-- Upload card -->
+    <div class="card">
+      <div class="drop-zone" id="dropZone" role="button" tabindex="0" aria-label="Upload audio file">
+        <div class="drop-icon">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"
+                  stroke="#9f7cff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <p class="drop-title">Drag &amp; drop your audio file here</p>
+        <p class="drop-sub">or <span id="browseLink">browse files</span> from your device</p>
+        <div class="format-pills">
+          <span class="pill">MP3</span>
+          <span class="pill">WAV</span>
+          <span class="pill">FLAC</span>
+          <span class="pill">OGG</span>
+        </div>
+      </div>
+
+      <!-- Selected file info -->
+      <div class="file-info hidden" id="fileInfo">
+        <div class="file-icon">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M9 18V5l12-2v13" stroke="#9f7cff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <circle cx="6" cy="18" r="3" stroke="#9f7cff" stroke-width="2"/>
+          </svg>
+        </div>
+        <div>
+          <div class="file-name" id="fileName">track.mp3</div>
+          <div class="file-size" id="fileSize">4.2 MB</div>
+        </div>
+        <div class="file-remove" id="removeFile" role="button" tabindex="0" aria-label="Remove file" title="Remove">×</div>
+      </div>
+
+      <input type="file" id="fileInput" accept=".mp3,.wav,.flac,.ogg,audio/*">
+
+      <button class="predict-btn" id="predictBtn" disabled>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"
+                   stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="white"/>
+        </svg>
+        Predict Genre
+      </button>
+    </div>
+
+    <!-- Audio player card -->
+    <div class="card hidden" id="playerCard">
+      <p class="section-label">Preview</p>
+      <div class="player-row">
+        <button class="play-btn" id="playBtn" aria-label="Play/Pause">
+          <svg id="playIcon" width="16" height="16" viewBox="0 0 24 24" fill="white" aria-hidden="true">
+            <polygon points="5 3 19 12 5 21 5 3"/>
+          </svg>
+          <svg id="pauseIcon" width="16" height="16" viewBox="0 0 24 24" fill="white" class="hidden" aria-hidden="true">
+            <rect x="6" y="4" width="4" height="16" rx="1"/>
+            <rect x="14" y="4" width="4" height="16" rx="1"/>
+          </svg>
+        </button>
+        <div class="progress-track" id="progressTrack" role="slider" aria-label="Playback position">
+          <div class="progress-fill" id="progressFill" style="width:0%"></div>
+        </div>
+        <span class="time-label" id="timeLabel">0:00</span>
+      </div>
+      <div class="waveform" id="waveform" aria-hidden="true"></div>
+    </div>
+
+    <!-- Result card -->
+    <div class="card result-card hidden" id="resultCard" aria-live="polite">
+      <p class="section-label">Prediction Result</p>
+      <div class="result-top">
+        <div>
+          <div class="genre-badge">Top Match</div>
+          <div class="genre-name" id="genreText">—</div>
+        </div>
+        <div class="conf-block">
+          <div class="label">Confidence</div>
+          <div class="conf-pct" id="confText">—</div>
+        </div>
+      </div>
+
+      <div class="conf-row">
+        <span class="c-label">Confidence score</span>
+      </div>
+      <div class="conf-track">
+        <div class="conf-fill" id="confFill" style="width:0%"></div>
+      </div>
+
+      <div class="other-genres" id="otherGenres"></div>
+    </div>
+
+    <footer>Powered by <span>Deep Learning</span> &nbsp;·&nbsp; AI Music Genre Classifier</footer>
+  </div>
+</div>
+
+<script>
+  /* ── DOM refs ── */
+  const fileInput    = document.getElementById('fileInput');
+  const dropZone     = document.getElementById('dropZone');
+  const browseLink   = document.getElementById('browseLink');
+  const fileInfoEl   = document.getElementById('fileInfo');
+  const fileNameEl   = document.getElementById('fileName');
+  const fileSizeEl   = document.getElementById('fileSize');
+  const removeFileEl = document.getElementById('removeFile');
+  const predictBtn   = document.getElementById('predictBtn');
+  const playerCard   = document.getElementById('playerCard');
+  const resultCard   = document.getElementById('resultCard');
+  const waveformEl   = document.getElementById('waveform');
+  const playBtn      = document.getElementById('playBtn');
+  const playIcon     = document.getElementById('playIcon');
+  const pauseIcon    = document.getElementById('pauseIcon');
+  const progressFill = document.getElementById('progressFill');
+  const progressTrack= document.getElementById('progressTrack');
+  const timeLabel    = document.getElementById('timeLabel');
+  const genreText    = document.getElementById('genreText');
+  const confText     = document.getElementById('confText');
+  const confFill     = document.getElementById('confFill');
+  const otherGenres  = document.getElementById('otherGenres');
+
+  /* ── State ── */
+  let audioEl = null;
+  let playing = false;
+
+  const GENRES = [
+    'Hip-Hop','Electronic','Jazz','Classical','Rock',
+    'Pop','R&B','Metal','Country','Reggae','Blues','Indie'
+  ];
+
+  /* ── Helpers ── */
+  function formatSize(bytes) {
+    return bytes < 1024 * 1024
+      ? (bytes / 1024).toFixed(1) + ' KB'
+      : (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+  }
+
+  function formatTime(s) {
+    const m   = Math.floor(s / 60);
+    const sec = Math.floor(s % 60);
+    return m + ':' + String(sec).padStart(2, '0');
+  }
+
+  /* ── Waveform ── */
+  function buildWaveform() {
+    waveformEl.innerHTML = '';
+    for (let i = 0; i < 80; i++) {
+      const b = document.createElement('div');
+      b.className = 'bar';
+      b.style.height = (10 + Math.random() * 54) + 'px';
+      waveformEl.appendChild(b);
+    }
+  }
+
+  function updateWaveBars(pct) {
+    const bars = waveformEl.querySelectorAll('.bar');
+    const idx  = Math.floor((pct / 100) * bars.length);
+    bars.forEach((b, i) => {
+      b.classList.remove('active', 'played');
+      if      (i === idx) b.classList.add('active');
+      else if (i < idx)   b.classList.add('played');
+    });
+  }
+
+  /* ── Load file ── */
+  function loadFile(file) {
+    fileNameEl.textContent = file.name;
+    fileSizeEl.textContent = formatSize(file.size);
+    fileInfoEl.classList.remove('hidden');
+    predictBtn.disabled = false;
+    resultCard.classList.add('hidden');
+
+    /* Audio */
+    if (audioEl) { audioEl.pause(); URL.revokeObjectURL(audioEl.src); }
+    audioEl = new Audio(URL.createObjectURL(file));
+
+    audioEl.addEventListener('timeupdate', () => {
+      if (!audioEl.duration) return;
+      const pct = (audioEl.currentTime / audioEl.duration) * 100;
+      progressFill.style.width = pct + '%';
+      updateWaveBars(pct);
+      timeLabel.textContent = formatTime(audioEl.currentTime);
+    });
+
+    audioEl.addEventListener('ended', () => {
+      playing = false;
+      playIcon.classList.remove('hidden');
+      pauseIcon.classList.add('hidden');
+      progressFill.style.width = '0%';
+      timeLabel.textContent = '0:00';
+      updateWaveBars(0);
+    });
+
+    buildWaveform();
+    playerCard.classList.remove('hidden');
+
+    /* Reset player UI */
+    playing = false;
+    playIcon.classList.remove('hidden');
+    pauseIcon.classList.add('hidden');
+    progressFill.style.width = '0%';
+    timeLabel.textContent = '0:00';
+  }
+
+  /* ── Upload events ── */
+  browseLink.addEventListener('click',  (e) => { e.stopPropagation(); fileInput.click(); });
+  dropZone.addEventListener('click',    () => fileInput.click());
+  dropZone.addEventListener('keydown',  (e) => { if (e.key === 'Enter' || e.key === ' ') fileInput.click(); });
+
+  fileInput.addEventListener('change', (e) => {
+    if (e.target.files[0]) loadFile(e.target.files[0]);
+  });
+
+  dropZone.addEventListener('dragover',  (e) => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+  dropZone.addEventListener('dragleave', ()  => dropZone.classList.remove('drag-over'));
+  dropZone.addEventListener('drop', (e) => {
+    e.preventDefault();
+    dropZone.classList.remove('drag-over');
+    const f = e.dataTransfer.files[0];
+    if (f) loadFile(f);
+  });
+
+  removeFileEl.addEventListener('click', reset);
+  removeFileEl.addEventListener('keydown', (e) => { if (e.key === 'Enter') reset(); });
+
+  function reset() {
+    if (audioEl) { audioEl.pause(); URL.revokeObjectURL(audioEl.src); audioEl = null; }
+    playing = false;
+    fileInfoEl.classList.add('hidden');
+    playerCard.classList.add('hidden');
+    resultCard.classList.add('hidden');
+    predictBtn.disabled = true;
+    fileInput.value = '';
+    predictBtn.innerHTML = `
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+        <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"
+                 stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="white"/>
+      </svg>
+      Predict Genre`;
+  }
+
+  /* ── Player controls ── */
+  playBtn.addEventListener('click', () => {
+    if (!audioEl) return;
+    if (playing) {
+      audioEl.pause(); playing = false;
+      playIcon.classList.remove('hidden');
+      pauseIcon.classList.add('hidden');
+    } else {
+      audioEl.play(); playing = true;
+      playIcon.classList.add('hidden');
+      pauseIcon.classList.remove('hidden');
+    }
+  });
+
+  progressTrack.addEventListener('click', (e) => {
+    if (!audioEl || !audioEl.duration) return;
+    const rect = progressTrack.getBoundingClientRect();
+    audioEl.currentTime = ((e.clientX - rect.left) / rect.width) * audioEl.duration;
+  });
+
+  /* ── Predict ── */
+  predictBtn.addEventListener('click', async () => {
+    const file = fileInput.files[0];
+    if (!file) return;
+
+    predictBtn.disabled = true;
+    predictBtn.innerHTML = '<div class="spinner"></div> Analyzing…';
+    resultCard.classList.add('hidden');
+
+    try {
+      const formData = new FormData();
+      formData.append('audio', file);
+
+      const res = await fetch('/api/predict', { method: 'POST', body: formData });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: `Server error ${res.status}` }));
+        throw new Error(err.error || `Server error ${res.status}`);
+      }
+
+      const { genre, confidence, candidates } = await res.json();
+      showResult(genre, confidence, candidates);
+
+    } catch (err) {
+      console.error('Prediction failed:', err);
+      showError(err.message || 'Prediction failed. Is the Flask server running?');
+    }
+  });
+
+  /* ── Error display ── */
+  function showError(message) {
+    predictBtn.disabled = false;
+    predictBtn.innerHTML = `
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+        <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"
+                 stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="white"/>
+      </svg>
+      Predict Genre`;
+
+    /* Reuse resultCard to show the error */
+    genreText.textContent = 'Error';
+    confText.textContent  = '';
+    confFill.style.width  = '0%';
+    otherGenres.innerHTML =
+      `<div style="color:#e05a5a;font-size:13px;margin-top:8px;">⚠ ${message}</div>`;
+    resultCard.classList.remove('hidden');
+  }
+
+  function showResult(genre, conf, candidates) {
+    genreText.textContent = genre;
+    confText.textContent  = conf + '%';
+
+    resultCard.classList.remove('hidden');
+    /* Trigger transition after paint */
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      confFill.style.width = conf + '%';
+    }));
+
+    /* Other candidates — backend returns [{genre, confidence}, …] */
+    otherGenres.innerHTML = '<div class="other-label">Other candidates</div>';
+    candidates.forEach((item) => {
+      const g = item.genre;
+      const c = item.confidence;
+      const chip = document.createElement('div');
+      chip.className = 'genre-chip';
+      chip.innerHTML =
+        `<div class="chip-bar" style="width:${Math.max(6, c * 2)}px"></div>
+         ${g}<span class="chip-pct">${c}%</span>`;
+      otherGenres.appendChild(chip);
+    });
+
+    predictBtn.disabled = false;
+    predictBtn.innerHTML = `
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+        <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"
+                 stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="white"/>
+      </svg>
+      Predict Again`;
+  }
+</script>
+</body>
+</html>
