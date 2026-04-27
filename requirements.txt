@@ -1,0 +1,19 @@
+# AI Music Genre Classifier — fixed dependencies for Render free tier
+
+flask>=3.0.0
+flask-cors>=4.0.0
+
+# tensorflow-cpu is lighter than full tensorflow (no GPU libs)
+# and works on all Python versions unlike tflite-runtime
+tensorflow-cpu>=2.15.0,<2.17.0
+
+tensorflow-hub>=0.16.0
+
+# Lightweight audio I/O (replaces librosa for WAV/FLAC/OGG)
+soundfile>=0.12.1
+resampy>=0.4.2
+
+# MP3 / M4A / AAC / WebM decoding (uses ffmpeg under the hood)
+pydub>=0.25.1
+
+numpy>=1.24.0,<2.0.0
