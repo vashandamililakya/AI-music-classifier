@@ -1,0 +1,17 @@
+# AI Music Genre Classifier — dependencies for Python 3.11 Docker
+
+flask>=3.0.0
+flask-cors>=4.0.0
+
+# TensorFlow 2.17.0 — last version with Python 3.11 Linux wheels confirmed
+tensorflow==2.17.0
+tensorflow-hub>=0.16.0
+
+# Lightweight audio I/O
+soundfile>=0.12.1
+resampy>=0.4.2
+
+# MP3 / M4A / AAC / WebM decoding
+pydub>=0.25.1
+
+numpy>=1.26.0,<2.0.0
